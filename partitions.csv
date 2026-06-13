@@ -1,0 +1,21 @@
+# FlightRadar - custom 16 MB partition table for the Waveshare ESP32-S3-Touch-LCD-7
+# (ESP32-S3-N16R8: 16 MB flash). The Arduino IDE (arduino-esp32) automatically
+# uses a partitions.csv found in the sketch folder, OVERRIDING whatever is picked
+# in Tools > Partition Scheme. We need a layout that has BOTH:
+#   * two OTA app slots (app0/app1) so web OTA updates work, and
+#   * a data partition labelled "spiffs" so LittleFS mounts and the coastline
+#     cache survives reboots (no more "partition spiffs could not be found").
+#
+# Two 3 MB app slots leave ~9.8 MB for the LittleFS cache.
+#
+# NOTE: the IDE's "Sketch uses X%" figure comes from the Tools > Partition Scheme
+# menu, not this file, so keep that menu on any scheme whose app slot is >= 3 MB
+# (e.g. "16M Flash (3MB APP/9.9MB FATFS)") for an accurate size report.
+#
+# Name,     Type, SubType,  Offset,    Size,     Flags
+nvs,        data, nvs,      0x9000,    0x5000,
+otadata,    data, ota,      0xe000,    0x2000,
+app0,       app,  ota_0,    0x10000,   0x300000,
+app1,       app,  ota_1,    0x310000,  0x300000,
+spiffs,     data, spiffs,   0x610000,  0x9E0000,
+coredump,   data, coredump, 0xFF0000,  0x10000,
