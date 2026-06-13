@@ -25,7 +25,11 @@ sdkconfig.defaults
 # ---- Build logs / scratch ----
 build_log.txt
 _gitstatus.txt
+_commitmsg.txt
 _empty_tmp/
+
+# ---- Hybrid-compile backup the pioarduino build leaves behind ----
+*.orig
 
 # ---- VS Code machine-specific files (keep extensions.json) ----
 .vscode/.browse.c_cpp.db*
