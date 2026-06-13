@@ -36,7 +36,7 @@
 #define API_HOST          "api.adsb.lol"
 
 // ---- Firmware version (shown on screen, web pages and serial) --------------
-#define FW_VERSION        "2.4.12"
+#define FW_VERSION        "2.4.13"
 
 // ---- Debugging (Serial/UART monitor at 115200 baud) ------------------------
 //  1 = print status, Wi-Fi, HTTP and JSON diagnostics to the Serial Monitor.
@@ -130,11 +130,13 @@
 // ---- Radar sweep animation -------------------------------------------------
 //  Each sweep step rebuilds and pushes the whole 768 KB canvas to PSRAM, which
 //  competes with the LCD scanout for the PSRAM bus. Animating the arm at the full
-//  30 fps poll rate was the last thing still disturbing the display, so we step it
-//  at ~10 fps instead and advance a larger angle per step to keep the same rotation
-//  speed. (Data updates and taps still repaint immediately, between arm steps.)
-#define SWEEP_REDRAW_MS  100      // ms between arm steps (100 = ~10 fps)
-#define SWEEP_STEP_DEG   15       // degrees per step (15 deg / 100 ms ~= 2.4 s per revolution)
+//  30 fps poll rate was the last thing still disturbing the display, so we redraw it
+//  at ~10 fps instead. The arm makes exactly ONE revolution per data-refresh interval
+//  (the "Refresh (seconds)" web setting / REFRESH_MS), phased to each fetch so it
+//  scans round and completes just as fresh aircraft data lands - like a real PPI
+//  scope. The per-step angle is computed from that, so there's nothing to set here.
+//  (Data updates and taps still repaint immediately, between arm steps.)
+#define SWEEP_REDRAW_MS  100      // ms between arm redraws (100 = ~10 fps)
 
 // ---- Canvas push / draw pacing (anti-roll) ---------------------------------
 //  Each redraw (a) draws the whole scene into a 768 KB PSRAM canvas and (b) copies

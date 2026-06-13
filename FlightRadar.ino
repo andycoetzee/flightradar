@@ -204,6 +204,11 @@ bool          firstFetch  = false;
 String        statusMsg   = "Starting...";
 bool          dataOk      = false;
 int           sweepAngle  = 0;
+// Phase reference for the sweep arm: one full revolution takes exactly one data
+// refresh interval (g.refreshMs), and the arm is reset to the top (0 deg) the moment
+// fresh aircraft data lands - so it scans round and "completes" just as the next pull
+// is due, like a real PPI scope refreshing its blips. Set by netTask after a fetch.
+volatile unsigned long gSweepEpochMs = 0;
 // Repaint-on-change: when the sweep is off the render loop only redraws+pushes the
 // canvas when something actually changed (new data, a tap, etc.) instead of 30x/s,
 // which removes the per-frame PSRAM copy that contends with the panel scanout. Set
@@ -1772,7 +1777,8 @@ void netTask(void* pv) {
         fetchAircraft();
         lastFetch  = millis();
         firstFetch = true;
-        gNeedRedraw = true;          // new positions -> repaint (sweep-off mode)
+        gNeedRedraw   = true;        // new positions -> repaint (sweep-off mode)
+        gSweepEpochMs = lastFetch;   // restart the sweep arm in step with the new data
       }
       // With nothing selected, keep the full-type lookup aimed at the nearest
       // in-range plane so the NEAREST panel shows the extended type as well. The
@@ -2026,13 +2032,18 @@ void loop() {
   static int           lastMin   = -1;
   bool doDraw;
   if (dataOk && g.sweep) {
-    // Advance the arm at ~10 fps (SWEEP_REDRAW_MS), not the 30 fps poll rate: each
+    // Redraw the arm at ~10 fps (SWEEP_REDRAW_MS), not the 30 fps poll rate: each
     // step pushes the whole canvas to PSRAM and that bus is shared with the scanout.
     // A data update or tap (gNeedRedraw) still repaints immediately between steps.
     bool sweepStep = (millis() - lastSweep >= SWEEP_REDRAW_MS);
     if (sweepStep) {
-      lastSweep  = millis();
-      sweepAngle = (sweepAngle + SWEEP_STEP_DEG) % 360;   // sweep turns with a live feed
+      lastSweep = millis();
+      // One revolution == one data-refresh interval, phased to the last fetch, so the
+      // arm makes exactly one scan per update and finishes as the next pull is due.
+      // Derived from elapsed time (not accumulated steps) so it can't drift; %360
+      // keeps it spinning at the right rate even if a fetch is late (back-off).
+      unsigned long period = g.refreshMs ? g.refreshMs : REFRESH_MS;
+      sweepAngle = (int)(((millis() - gSweepEpochMs) * 360UL / period) % 360UL);
     }
     doDraw = sweepStep || gNeedRedraw;
   } else {

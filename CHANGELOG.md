@@ -21,6 +21,18 @@ interpreted for firmware as:
 Adopted at `2.3.80`. Earlier releases used the same `x.y.z` format but bumped PATCH
 for every change regardless of type, so pre-2.3.80 numbers don't carry SemVer meaning.
 
+## 2.4.13
+- **Sweep arm now turns at the data-refresh rate.** The radar arm makes exactly one
+  revolution per refresh interval (the "Refresh (seconds)" web setting / `REFRESH_MS`)
+  instead of a fixed ~2.4 s spin, and it's phased to each fetch - it restarts at the
+  top (12 o'clock) the moment new aircraft data lands and completes the scan just as
+  the next pull is due, like a real PPI scope refreshing its blips. The per-step angle
+  is derived from elapsed time (not accumulated steps) so it can't drift, and `%360`
+  keeps it rotating at the right rate even if a fetch is delayed by API back-off. At the
+  default 12 s refresh the arm rotates much more slowly than before, which also eases
+  the per-frame PSRAM load. Removed the now-unused `SWEEP_STEP_DEG`; `SWEEP_REDRAW_MS`
+  still caps the redraw cadence at ~10 fps. (PATCH: tweak to an existing feature.)
+
 ## 2.4.12
 - **Added a PlatformIO build (`platformio.ini`) to enable the real RGB-panel fix.**
   The frame roll is PSRAM-bus starvation whose documented cures are ESP-IDF sdkconfig
