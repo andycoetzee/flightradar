@@ -36,7 +36,7 @@
 #define API_HOST          "api.adsb.lol"
 
 // ---- Firmware version (shown on screen, web pages and serial) --------------
-#define FW_VERSION        "2.4.13"
+#define FW_VERSION        "2.4.14"
 
 // ---- Debugging (Serial/UART monitor at 115200 baud) ------------------------
 //  1 = print status, Wi-Fi, HTTP and JSON diagnostics to the Serial Monitor.
@@ -132,9 +132,9 @@
 //  competes with the LCD scanout for the PSRAM bus. Animating the arm at the full
 //  30 fps poll rate was the last thing still disturbing the display, so we redraw it
 //  at ~10 fps instead. The arm makes exactly ONE revolution per data-refresh interval
-//  (the "Refresh (seconds)" web setting / REFRESH_MS), phased to each fetch so it
-//  scans round and completes just as fresh aircraft data lands - like a real PPI
-//  scope. The per-step angle is computed from that, so there's nothing to set here.
+//  (the "Refresh (seconds)" web setting / REFRESH_MS): it's anchored once at the first
+//  fetch and then free-runs continuously at that rate, so it never jumps back to 0 on a
+//  data read. The per-step angle is computed from that, so there's nothing to set here.
 //  (Data updates and taps still repaint immediately, between arm steps.)
 #define SWEEP_REDRAW_MS  100      // ms between arm redraws (100 = ~10 fps)
 

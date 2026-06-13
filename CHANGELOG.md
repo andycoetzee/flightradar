@@ -21,6 +21,13 @@ interpreted for firmware as:
 Adopted at `2.3.80`. Earlier releases used the same `x.y.z` format but bumped PATCH
 for every change regardless of type, so pre-2.3.80 numbers don't carry SemVer meaning.
 
+## 2.4.14
+- **Sweep arm no longer jumps back to 0 on every API read.** 2.4.13 re-anchored the
+  sweep phase to each fetch, which made the arm visibly snap back to the top every
+  refresh. It's now anchored just ONCE (at the first fetch) and free-runs continuously
+  at the refresh rate, so it turns smoothly without resyncing on a data read. (PATCH:
+  fixes the jump introduced in 2.4.13.)
+
 ## 2.4.13
 - **Sweep arm now turns at the data-refresh rate.** The radar arm makes exactly one
   revolution per refresh interval (the "Refresh (seconds)" web setting / `REFRESH_MS`)

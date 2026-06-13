@@ -205,9 +205,9 @@ String        statusMsg   = "Starting...";
 bool          dataOk      = false;
 int           sweepAngle  = 0;
 // Phase reference for the sweep arm: one full revolution takes exactly one data
-// refresh interval (g.refreshMs), and the arm is reset to the top (0 deg) the moment
-// fresh aircraft data lands - so it scans round and "completes" just as the next pull
-// is due, like a real PPI scope refreshing its blips. Set by netTask after a fetch.
+// refresh interval (g.refreshMs). Anchored ONCE (at the first fetch) and then left
+// alone, so the arm free-runs smoothly and never jumps back to 0 on a data read - it
+// just turns at the refresh rate continuously. (0 = not yet anchored.)
 volatile unsigned long gSweepEpochMs = 0;
 // Repaint-on-change: when the sweep is off the render loop only redraws+pushes the
 // canvas when something actually changed (new data, a tap, etc.) instead of 30x/s,
@@ -1778,7 +1778,8 @@ void netTask(void* pv) {
         lastFetch  = millis();
         firstFetch = true;
         gNeedRedraw   = true;        // new positions -> repaint (sweep-off mode)
-        gSweepEpochMs = lastFetch;   // restart the sweep arm in step with the new data
+        if (gSweepEpochMs == 0) gSweepEpochMs = lastFetch;  // anchor the sweep ONCE;
+                                     // it then free-runs and never resyncs on a read
       }
       // With nothing selected, keep the full-type lookup aimed at the nearest
       // in-range plane so the NEAREST panel shows the extended type as well. The
