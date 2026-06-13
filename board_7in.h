@@ -539,12 +539,15 @@ void drawPanel() {
   // ---- Selected / nearest aircraft detail ----
   int y = 100;
   const Aircraft* a = nullptr;
-  const char* title = "SELECTED";
+  // Default to NEAREST - the panel is in "nearest" mode unless the user has actually
+  // tapped a plane. (Previously this defaulted to SELECTED, so with nothing selected
+  // and no aircraft in range the header was stuck on SELECTED.)
+  const char* title = "NEAREST";
   // acList is sorted nearest-first, so acList[0] is the nearest; only treat it as
   // NEAREST when it's actually inside the current range. This keeps the panel in
   // step with the scope when the range is reduced below a plane's distance.
-  if (selected >= 0 && selected < acCount)              a = &acList[selected];
-  else if (acCount > 0 && acList[0].distNm <= rangeNm) { a = &acList[0]; title = "NEAREST"; }
+  if (selected >= 0 && selected < acCount)             { a = &acList[selected]; title = "SELECTED"; }
+  else if (acCount > 0 && acList[0].distNm <= rangeNm)   a = &acList[0];
 
   spr.setTextColor(TFT_ORANGE, TFT_BLACK);
   spr.drawString(title, px, y, 2); y += 20;

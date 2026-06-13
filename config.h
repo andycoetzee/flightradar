@@ -36,7 +36,7 @@
 #define API_HOST          "api.adsb.lol"
 
 // ---- Firmware version (shown on screen, web pages and serial) --------------
-#define FW_VERSION        "2.4.14"
+#define FW_VERSION        "2.4.15"
 
 // ---- Debugging (Serial/UART monitor at 115200 baud) ------------------------
 //  1 = print status, Wi-Fi, HTTP and JSON diagnostics to the Serial Monitor.

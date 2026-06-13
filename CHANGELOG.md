@@ -21,6 +21,13 @@ interpreted for firmware as:
 Adopted at `2.3.80`. Earlier releases used the same `x.y.z` format but bumped PATCH
 for every change regardless of type, so pre-2.3.80 numbers don't carry SemVer meaning.
 
+## 2.4.15
+- **Detail panel no longer stuck on "SELECTED" with an empty scope.** The panel title
+  defaulted to SELECTED and only became NEAREST when an in-range aircraft existed, so
+  with nothing tapped and no aircraft in range it wrongly read SELECTED above "No
+  aircraft in range." It now defaults to NEAREST and shows SELECTED only when a plane
+  is actually selected. (PATCH: bug fix.)
+
 ## 2.4.14
 - **Sweep arm no longer jumps back to 0 on every API read.** 2.4.13 re-anchored the
   sweep phase to each fetch, which made the arm visibly snap back to the top every
