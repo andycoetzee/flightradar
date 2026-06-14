@@ -759,6 +759,22 @@ void drawScreen() {
 }
 
 void drawConfigPortalScreen() {
+  // BACK was tapped: paint an immediate acknowledgement. The actual Wi-Fi switch-back
+  // runs on core 0 and blocks for a few seconds; without this the portal screen would
+  // sit unchanged the whole time and the tap would feel ignored (so you'd tap again).
+  if (gLeavingPortal) {
+    spr.fillSprite(TFT_BLACK);
+    spr.setTextDatum(MC_DATUM);
+    spr.setTextColor(TFT_YELLOW, TFT_BLACK);
+    spr.drawString("LEAVING SETUP", SCR_W / 2, SCR_H / 2 - 40, 4);
+    spr.setTextColor(TFT_WHITE, TFT_BLACK);
+    spr.drawString("Reconnecting to Wi-Fi...", SCR_W / 2, SCR_H / 2 + 10, 4);
+    spr.setTextColor(0x7BEF, TFT_BLACK);
+    spr.drawString("Please wait", SCR_W / 2, SCR_H / 2 + 56, 2);
+    pushCanvas();
+    return;
+  }
+
   spr.fillSprite(TFT_BLACK);
   spr.fillRect(0, 0, SCR_W, 30, 0x10A2);
   spr.setTextColor(TFT_YELLOW, 0x10A2);
@@ -768,7 +784,7 @@ void drawConfigPortalScreen() {
   spr.drawString("v" FW_VERSION, 260, 11, 2);
   spr.setTextDatum(TR_DATUM);
   spr.setTextColor(TFT_WHITE, 0x10A2);
-  spr.drawString((String(WiFi.softAPgetStationNum()) + " joined").c_str(), SCR_W - 10, 8, 4);
+  spr.drawString((String(apStations) + " joined").c_str(), SCR_W - 10, 8, 4);  // cached; no esp_wifi call on core 1
 
   // Back-to-radar button (top-right, below the header). Tapping it leaves the
   // portal and reconnects to the saved network without a reboot.
@@ -793,7 +809,7 @@ void drawConfigPortalScreen() {
   spr.setTextColor(TFT_CYAN, TFT_BLACK);
   spr.drawString("2) Open in your browser:", 40, y, 4); y += 44;
   spr.setTextColor(TFT_GREEN, TFT_BLACK);
-  spr.drawString((String("http://") + WiFi.softAPIP().toString()).c_str(), 80, y, 4); y += 50;
+  spr.drawString((String("http://") + apIpStr).c_str(), 80, y, 4); y += 50;  // cached; no esp_wifi call on core 1
   spr.setTextColor(0x7BEF, TFT_BLACK);
   spr.drawString("Set Wi-Fi, location & options, then Save.", 40, SCR_H - 36, 4);
   pushCanvas();

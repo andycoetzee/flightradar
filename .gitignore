@@ -24,6 +24,9 @@ sdkconfig.defaults
 
 # ---- Build logs / scratch ----
 build_log.txt
+upload_log.txt
+monitor_log.txt
+crash_log.txt
 _gitstatus.txt
 _commitmsg.txt
 _empty_tmp/

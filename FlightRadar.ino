@@ -187,6 +187,17 @@ volatile bool otaActive = false; // true while a web firmware upload is in progr
 volatile bool portalRequested = false;     // CFG tapped: netTask starts the portal
                                             // safely (Wi-Fi is owned by core 0)
 volatile bool portalExitRequested = false; // BACK tapped: netTask leaves the portal
+volatile bool gLeavingPortal      = false; // BACK acknowledged: render core 1 shows a
+                                            // "Reconnecting..." screen immediately while
+                                            // core 0 does the (multi-second, blocking)
+                                            // Wi-Fi switch-back, so the tap feels instant
+
+// Cached setup-portal info so the render core (core 1) NEVER calls esp_wifi while
+// core 0 is reconfiguring Wi-Fi - concurrent esp_wifi calls from two cores crash
+// (this is what reset the device on CFG). Core 0 fills these in startConfigPortal()
+// and refreshes the join count each netTask loop; drawConfigPortalScreen() just reads.
+char          apIpStr[16]   = "192.168.4.1";
+volatile int  apStations    = 0;
 
 // -----------------------------------------------------------------------------
 //  State
@@ -701,8 +712,18 @@ void fetchAircraft() {
   dataOk   = true;
   UNLOCK();
 
-  setStatus(String(pCount) + " aircraft");
-  DBG("Fetched %d aircraft, free heap %u bytes\n", pCount, ESP.getFreeHeap());
+  // Report the count that's actually ON the scope (within the range ring), not the
+  // raw API count. The feed is queried with rangeNm as its radius, but the server's
+  // radius and our local haversine disagree by a hair at the boundary, so a plane can
+  // sit in acList at e.g. 20.2 nm while the ring is 20 nm. The scope, the TRACKED
+  // counter and the detail panel all cull distNm > rangeNm, so counting the raw total
+  // here made the status line say "1 aircraft" while everything else said "none in
+  // range". parseBuf is sorted nearest-first, so the in-range planes are a prefix.
+  int inRange = 0;
+  while (inRange < pCount && parseBuf[inRange].distNm <= rangeNm) inRange++;
+  setStatus(String(inRange) + " aircraft");
+  DBG("Fetched %d aircraft (%d in range), free heap %u bytes\n",
+      pCount, inRange, ESP.getFreeHeap());
 }
 
 // -----------------------------------------------------------------------------
@@ -1673,24 +1694,34 @@ void requestConfigPortal() {
 void startConfigPortal() {
   apMode = true;
   portalExitRequested = false;     // clear any stale exit request
+  gLeavingPortal      = false;
   selected = -1;
   setStatus("Setup mode");
+  // Stop mDNS BEFORE touching Wi-Fi. Its background service_task reacts to the
+  // netif going away (disconnect / mode switch) by re-initialising its PCB, which
+  // dereferences the now-stale esp_netif handle and crashes core 0 with a
+  // LoadStoreError (esp_netif_is_netif_up). This - not a cross-core race - is what
+  // reset the device on CFG. Tearing mDNS down first removes that handler.
+  MDNS.end();
   server.close();
   WiFi.disconnect(true);
   WiFi.mode(WIFI_AP);
   delay(100);
   WiFi.softAP(AP_SSID, strlen(AP_PASS) ? AP_PASS : NULL);
   delay(300);
-  dns.start(53, "*", WiFi.softAPIP());
+  IPAddress apIp = WiFi.softAPIP();
+  strlcpy(apIpStr, apIp.toString().c_str(), sizeof(apIpStr));  // cached for core 1
+  apStations = 0;
+  dns.start(53, "*", apIp);
   server.begin();
-  DBG("Config portal AP '%s', open http://%s\n",
-      AP_SSID, WiFi.softAPIP().toString().c_str());
+  DBG("Config portal AP '%s', open http://%s\n", AP_SSID, apIpStr);
 }
 
 // Ask to leave the setup portal (BACK button). Safe to call from the render
 // core: netTask performs the Wi-Fi switch-back (see exitConfigPortal).
 void requestConfigExit() {
-  portalExitRequested = true;
+  gLeavingPortal      = true;   // core 1 paints "Reconnecting..." on the very next frame
+  portalExitRequested = true;   // core 0 performs the actual switch-back
 }
 
 // MUST run on the network core (core 0) - it reconfigures Wi-Fi. Tears the AP
@@ -1713,6 +1744,7 @@ void exitConfigPortal() {
   }
   firstFetch = false;      // pull fresh aircraft immediately
   portalRequested = false; // clear any stale portal request
+  gLeavingPortal  = false; // reconnect done - drop the "Reconnecting..." overlay
   apMode     = false;      // hand the screen back to the radar
 }
 
@@ -1746,6 +1778,11 @@ void netTask(void* pv) {
       portalExitRequested = false;
       exitConfigPortal();
     }
+
+    // While the setup portal is up, refresh the join count here on core 0 - the only
+    // core allowed to call esp_wifi - so the portal screen (core 1) can show it from
+    // the cached value without a cross-core Wi-Fi call.
+    if (apMode) apStations = WiFi.softAPgetStationNum();
 
     // Pause fetching during an OTA flash (avoids a TLS + flash-write heap spike).
     if (!apMode && !Update.isRunning() && WiFi.status() == WL_CONNECTED) {
@@ -1984,7 +2021,7 @@ void loop() {
     static bool wasTp = false;
     int tx, ty;
     bool tp = readTouch(tx, ty);
-    if (tp && !wasTp &&
+    if (tp && !wasTp && !gLeavingPortal &&     // ignore taps once BACK is acknowledged
         tx >= cfgBackX && tx <= cfgBackX + cfgBackW &&
         ty >= cfgBackY && ty <= cfgBackY + cfgBackH) {
       requestConfigExit();

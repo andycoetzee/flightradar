@@ -21,6 +21,51 @@ interpreted for firmware as:
 Adopted at `2.3.80`. Earlier releases used the same `x.y.z` format but bumped PATCH
 for every change regardless of type, so pre-2.3.80 numbers don't carry SemVer meaning.
 
+## 2.4.19
+- **Setup-portal BACK button now responds instantly.** Tapping BACK only *requested* the
+  exit; the real work (`exitConfigPortal()` - tear down the AP and reconnect to the saved
+  network) runs on core 0 and blocks for several seconds, during which core 1 kept redrawing
+  the unchanged portal screen. With no visible acknowledgement the tap felt ignored, so you'd
+  press it repeatedly. BACK now immediately paints a "LEAVING SETUP / Reconnecting to Wi-Fi..."
+  screen (via a `gLeavingPortal` flag set the moment the tap lands) and ignores further taps
+  until the switch-back completes.
+
+## 2.4.18
+- **Fixed the status line disagreeing with the scope ("1 aircraft" vs "No aircraft in
+  range").** The blue status line above the RNG- button reported the raw count the feed
+  returned (`pCount`), but the scope, the TRACKED counter and the detail panel all cull
+  planes whose locally-computed distance exceeds the range ring. The feed is queried with
+  `rangeNm` as its radius, yet the server's radius and our haversine differ by a hair at
+  the boundary, so a single edge-of-range plane could be counted by the status line while
+  everything else correctly showed none in range. The status line now counts only in-range
+  planes (matching TRACKED and the scope), so the numbers can't contradict.
+
+## 2.4.17
+- **Actually fixed the CFG button rebooting the device (stale mDNS netif).** The 2.4.16
+  cross-core caching fix did not stop the reset - a serial backtrace showed the real
+  cause was the mDNS responder, not our code. After connecting to Wi-Fi we start mDNS
+  (`MDNS.begin("flightradar")`); when CFG then tears Wi-Fi down to bring up the AP portal
+  (`WiFi.disconnect()` / `WiFi.mode(WIFI_AP)`), mDNS's background `service_task` reacts to
+  the interface change by re-initialising its PCB and dereferences the now-freed
+  `esp_netif` handle, crashing core 0 with a `LoadStoreError` in `esp_netif_is_netif_up`
+  (`mdns service_task -> mdns_priv_pcb_enable -> pcb_if_init_lwip -> join_group`).
+  Fix: call `MDNS.end()` as the first step of `startConfigPortal()`, before any Wi-Fi
+  teardown, so that handler is gone before the netif disappears. (The 2.4.16 cached
+  AP-info globals are still a good idea and remain in place.)
+
+## 2.4.16
+- **Fixed CFG button rebooting the device (cross-core Wi-Fi race).** Tapping CFG made
+  the device flash a garbled frame and restart. Cause: the setup-portal screen, drawn
+  on the render core (core 1), called `WiFi.softAPgetStationNum()` / `WiFi.softAPIP()`
+  every frame while core 0 was simultaneously reconfiguring Wi-Fi in
+  `startConfigPortal()`. Concurrent `esp_wifi` calls from two cores trigger a panic
+  (and reboot) under the IDF 5.5 stack used by the PlatformIO build - which is why it
+  only began failing after the migration. Now only core 0 touches `esp_wifi`: it caches
+  the AP IP once and refreshes the join count each netTask loop, and the portal screen
+  reads those cached values. (PATCH: bug fix.)
+  - Note: the panic backtrace isn't visible over the native USB-CDC serial (the port
+    drops on reset), which is why this was diagnosed from the code path rather than a log.
+
 ## 2.4.15
 - **Detail panel no longer stuck on "SELECTED" with an empty scope.** The panel title
   defaulted to SELECTED and only became NEAREST when an in-range aircraft existed, so
